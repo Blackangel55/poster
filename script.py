@@ -201,6 +201,43 @@ USAGE_SEARCH_TEXT = """ℹ️ **Usage:** `/search Title`
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# FORCE SUBSCRIBE
+# ════════════════════════════════════════════════════════════════════════════
+
+def build_fsub_message(channels: list[dict]) -> tuple[str, "InlineKeyboardMarkup"]:
+    """
+    Build the force-subscribe message and join buttons.
+    channels: list of dicts with keys: id, title, invite_link
+    """
+    text = (
+        "👋 **Hello!**\n\n"
+        "To use this bot you must join our channel(s) first:\n\n"
+    )
+    for i, ch in enumerate(channels, 1):
+        text += f"{i}. **{ch['title']}**\n"
+
+    text += "\nAfter joining, tap **✅ I've Joined** below."
+
+    buttons = []
+    for ch in channels:
+        buttons.append([InlineKeyboardButton(f"➕ Join {ch['title']}", url=ch["invite_link"])])
+    buttons.append([InlineKeyboardButton("✅ I've Joined", callback_data="check_fsub")])
+
+    return text, InlineKeyboardMarkup(buttons)
+
+
+FSUB_STILL_NOT_JOINED = (
+    "❌ You haven't joined all required channels yet!\n\n"
+    "Please join all channels and tap **✅ I've Joined** again."
+)
+
+FSUB_JOINED = "✅ **Verified!** Welcome, enjoy the bot 🎬"
+
+USAGE_ADDFSUB = "Usage: `/addfsub <channel_id>`\nExample: `/addfsub -1001234567890`"
+USAGE_DELFSUB = "Usage: `/delfsub <channel_id>`\nExample: `/delfsub -1001234567890`"
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # CAPTION BUILDER
 # ════════════════════════════════════════════════════════════════════════════
 
