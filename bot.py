@@ -126,6 +126,8 @@ async def fetch_poster(
                     title, year, season, query,
                     data.get("type", "?"),
                 )
+                # Full response dump — remove after debugging
+                log.info("Spidy API full response: %s", data)
                 return data
     except aiohttp.ClientResponseError as e:
         log.error("Spidy API HTTP %s: %s", e.status, e.message)
