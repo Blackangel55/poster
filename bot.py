@@ -1,25 +1,3 @@
-"""
-OTT Poster Bot — powered by Kurigram (Pyrogram fork)
-Fetches movie & TV show posters using the Spidy Poster API.
-
-Spidy API Endpoints:
-  Movie  → /v1/fetch?api_key=KEY&title=RRR&year=2022
-  TV     → /v1/fetch?api_key=KEY&title=Asur&season=2
-  Query  → /v1/fetch?api_key=KEY&query=Asur.S02.1080p.mkv
-
-Commands:
-  /start          – Welcome message with buttons
-  /help           – Full help & tips
-  /about          – About this bot
-  /movie RRR 2022 – Movie poster (optional year)
-  /tv Asur 2      – TV season poster (optional season number)
-  /query filename – Filename parser search
-  /search Asur    – Auto plain-title search
-  plain text      – Quick search by typing a title
-
-All messages/texts live in script.py — edit there, not here.
-"""
-
 import os
 import asyncio
 import threading
@@ -144,6 +122,34 @@ async def fetch_poster(
     return None
 
 
+# ─── IMAGE DOWNLOADER ────────────────────────────────────────────────────────
+async def download_image(url: str) -> bytes | None:
+    """
+    Download image from URL and return raw bytes.
+    Uses a browser-like User-Agent to bypass CDN restrictions (Zee5, Hotstar etc.)
+    """
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://www.zee5.com/",
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                url,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=20),
+            ) as resp:
+                resp.raise_for_status()
+                return await resp.read()
+    except Exception as e:
+        log.error("Image download failed (%s): %s", url, e)
+    return None
+
+
 # ─── CORE POSTER SENDER ──────────────────────────────────────────────────────
 async def send_poster(
     client: Client,
@@ -174,21 +180,26 @@ async def send_poster(
     caption  = build_caption(data, plot_max=PLOT_MAX_CHARS)
     keyboard = build_keyboard(data)
 
-    # ── Send landscape image ──
-    try:
+    # ── Download image bytes first (CDN URLs like Zee5 block Telegram's fetcher)
+    image_bytes = await download_image(image_url)
+
+    if image_bytes:
+        # ── Send as raw bytes — always works regardless of CDN restrictions ──
+        import io
         await client.send_photo(
             chat_id=message.chat.id,
-            photo=image_url,
+            photo=io.BytesIO(image_bytes),
             caption=caption,
             reply_markup=keyboard,
         )
-    except Exception as e:
-        log.warning("send_photo failed (%s) — sending as link", e)
+    else:
+        # ── Last resort: send as clickable link ──
+        from pyrogram.types import LinkPreviewOptions
         fallback = f"{caption}\n\n🖼 [View Image]({image_url})"
         await message.reply(
             fallback,
             reply_markup=keyboard,
-            disable_web_page_preview=False,
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
         )
 
 
