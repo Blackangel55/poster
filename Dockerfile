@@ -3,7 +3,10 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends gcc \
+# TgCrypto is a C extension — needs gcc + python headers to compile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -14,8 +17,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Copy installed packages from builder
 COPY --from=builder /install /usr/local
-COPY bot.py config.py ./
+
+# Copy bot source files
+COPY bot.py config.py script.py ./
 
 # Non-root user for security
 RUN useradd -m botuser
