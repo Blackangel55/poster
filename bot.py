@@ -75,6 +75,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ─── KURIGRAM CLIENT ─────────────────────────────────────────────────────────
+# Session file is stored at SESSION_NAME path (default: /app/sessions/ott_poster_bot)
 app = Client(
     SESSION_NAME,
     api_id=API_ID,
