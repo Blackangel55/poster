@@ -208,37 +208,23 @@ def build_caption(data: dict, plot_max: int = 280) -> str:
     """
     Build a Markdown caption from Spidy API response.
 
-    Spidy response fields:
-      title    → str
-      year     → int
-      type     → "movie" | "tv"
-      season   → "Season 2" (string, not int)
-      poster   → URL
-      landscape → URL
+    Real Spidy API fields (from live response):
+      title     → str
+      year      → int
+      landscape → URL (wide banner image — main image returned)
     """
-    title   = data.get("title", "Unknown")
-    year    = data.get("year", "")
-    kind    = data.get("type", "")          # "movie" or "tv"
-    season  = data.get("season", "")        # "Season 2"
+    title = data.get("title", "Unknown")
+    year  = data.get("year", "")
 
     lines = []
 
-    # ── Title + type icon ──
-    icon = "📺" if kind == "tv" else "🎬"
-
-    if kind == "tv" and season:
-        lines.append(f"{icon} **{title}** — {season}")
-    elif year:
-        lines.append(f"{icon} **{title}** ({year})")
+    # ── Title + year ──
+    if year:
+        lines.append(f"🎬 **{title}** ({year})")
     else:
-        lines.append(f"{icon} **{title}**")
+        lines.append(f"🎬 **{title}**")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━")
-
-    # ── Type badge ──
-    if kind:
-        badge = "🎬 Movie" if kind == "movie" else "📺 TV Series"
-        lines.append(badge)
 
     return "\n".join(lines)
 
@@ -247,21 +233,9 @@ def build_caption(data: dict, plot_max: int = 280) -> str:
 # KEYBOARD BUILDER
 # ════════════════════════════════════════════════════════════════════════════
 
-def build_keyboard(
-    data: dict,
-    landscape_url: str = None,
-) -> InlineKeyboardMarkup | None:
+def build_keyboard(data: dict) -> InlineKeyboardMarkup | None:
     """
     Build inline buttons from Spidy API response.
-    Shows a 'View Landscape' button if the API returns a landscape image.
+    No extra URLs in current API response — reserved for future use.
     """
-    buttons = []
-
-    # Landscape / banner image button
-    landscape = landscape_url or data.get("landscape")
-    if landscape:
-        buttons.append(
-            InlineKeyboardButton("🖼 Landscape Poster", url=landscape)
-        )
-
-    return InlineKeyboardMarkup([buttons]) if buttons else None
+    return None
