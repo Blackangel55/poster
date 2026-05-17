@@ -1,3 +1,32 @@
+"""
+OTT Poster Bot — powered by Kurigram (Pyrogram fork)
+Fetches movie & TV show posters using the Spidy Poster API.
+
+Commands (users):
+  /start          – Welcome message
+  /help           – Help & tips
+  /about          – About this bot
+  /movie RRR 2022 – Movie poster
+  /tv Asur 2      – TV season poster
+  /query filename – Filename parser search
+  /search title   – General search
+  plain text      – Quick search
+
+Commands (owner/admin):
+  /addadmin <id>  – Add an admin
+  /deladmin <id>  – Remove an admin
+  /admins         – List all admins
+  /ban <id>       – Ban a user
+  /unban <id>     – Unban a user
+  /banned         – List banned users
+  /stats          – Bot statistics
+  /broadcast      – Broadcast a message to all users (reply to a message)
+  /addfsub <id>   – Add a force subscribe channel
+  /delfsub <id>   – Remove a force subscribe channel
+  /listfsub       – List all force subscribe channels
+"""
+
+import io
 import os
 import asyncio
 import threading
@@ -5,7 +34,11 @@ import logging
 import aiohttp
 
 from pyrogram import Client, filters
-from pyrogram.types import CallbackQuery, Message
+from pyrogram.types import (
+    CallbackQuery,
+    LinkPreviewOptions,
+    Message,
+)
 
 # ─── LOAD .env ────────────────────────────────────────────────────────────────
 try:
@@ -19,6 +52,8 @@ from config import (
     API_ID,
     API_HASH,
     BOT_TOKEN,
+    OWNER_ID,
+    ADMIN_IDS,
     SPIDY_KEY,
     SPIDY_BASE,
     SESSION_NAME,
@@ -43,7 +78,15 @@ from script import (
     USAGE_SEARCH_TEXT,
     build_caption,
     build_keyboard,
+    build_fsub_message,
+    FSUB_STILL_NOT_JOINED,
+    FSUB_JOINED,
+    USAGE_ADDFSUB,
+    USAGE_DELFSUB,
 )
+
+# ─── DATABASE ────────────────────────────────────────────────────────────────
+from database import db
 
 # ─── LOGGING ─────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -53,13 +96,87 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ─── KURIGRAM CLIENT ─────────────────────────────────────────────────────────
-# Session file is stored at SESSION_NAME path (default: /app/sessions/ott_poster_bot)
 app = Client(
     SESSION_NAME,
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
 )
+
+
+# ─── HELPERS ─────────────────────────────────────────────────────────────────
+async def is_admin(user_id: int) -> bool:
+    """Check if user is owner, static admin, or DB admin."""
+    if user_id == OWNER_ID:
+        return True
+    if user_id in ADMIN_IDS:
+        return True
+    return await db.is_admin(user_id)
+
+
+async def is_banned(user_id: int) -> bool:
+    """Owner and admins can never be banned."""
+    if user_id == OWNER_ID or await is_admin(user_id):
+        return False
+    return await db.is_banned(user_id)
+
+
+# ─── FORCE SUBSCRIBE CHECK ───────────────────────────────────────────────────
+async def check_fsub(client: Client, user_id: int) -> tuple[bool, list[dict]]:
+    """
+    Returns (all_joined, not_joined_channels).
+    not_joined_channels is a list of dicts: {id, title, invite_link}
+    """
+    channel_ids = await db.get_fsub_channels()
+    if not channel_ids:
+        return True, []
+
+    not_joined = []
+    for ch_id in channel_ids:
+        try:
+            member = await client.get_chat_member(ch_id, user_id)
+            if member.status.value in ("left", "banned", "restricted"):
+                raise Exception("not member")
+        except Exception:
+            try:
+                chat = await client.get_chat(ch_id)
+                invite = await client.export_chat_invite_link(ch_id)
+                not_joined.append({
+                    "id": ch_id,
+                    "title": chat.title,
+                    "invite_link": invite,
+                })
+            except Exception as e:
+                log.warning("Could not get fsub channel info for %s: %s", ch_id, e)
+
+    return len(not_joined) == 0, not_joined
+
+
+# ─── MIDDLEWARE — register user, check ban & fsub ────────────────────────────
+@app.on_message(filters.private & filters.incoming, group=-1)
+async def middleware(client: Client, message: Message):
+    user_id = message.from_user.id
+
+    # Auto-register user
+    await db.add_user(user_id)
+
+    # Block banned users
+    if await is_banned(user_id):
+        await message.reply("🚫 You are banned from using this bot.")
+        message.stop_propagation()
+        return
+
+    # Skip fsub check for admins and /start command
+    cmd = message.command[0].lower() if message.command else ""
+    if await is_admin(user_id) or cmd == "start":
+        return
+
+    # Force subscribe check
+    joined, missing = await check_fsub(client, user_id)
+    if not joined:
+        text, keyboard = build_fsub_message(missing)
+        await message.reply(text, reply_markup=keyboard)
+        message.stop_propagation()
 
 
 # ─── SPIDY API ───────────────────────────────────────────────────────────────
@@ -69,19 +186,8 @@ async def fetch_poster(
     season: str = None,
     query: str = None,
 ) -> dict | None:
-    """
-    Call Spidy Poster API.
-
-    Modes:
-      - title + year  → movie search
-      - title + season → TV season search
-      - title only    → general search
-      - query         → filename parser (e.g. Asur.S02.1080p.mkv)
-    """
     params = {"api_key": SPIDY_KEY}
-
     if query:
-        # Filename parser mode — takes priority
         params["query"] = query
     else:
         params["title"] = title
@@ -101,17 +207,13 @@ async def fetch_poster(
                 data = await resp.json()
                 log.info("Spidy API raw response: %s", data)
 
-                # API returns {"results": [...]} — pick the first match
                 results = data.get("results", [])
                 if not results:
-                    log.warning("Spidy API returned empty results for: %s", title or query)
+                    log.warning("Spidy API returned empty results")
                     return None
 
                 result = results[0]
-                log.info(
-                    "Spidy API → title=%s year=%s season=%s query=%s | result=%s",
-                    title, year, season, query, result,
-                )
+                log.info("Spidy API → picked result: %s", result)
                 return result
     except aiohttp.ClientResponseError as e:
         log.error("Spidy API HTTP %s: %s", e.status, e.message)
@@ -124,10 +226,7 @@ async def fetch_poster(
 
 # ─── IMAGE DOWNLOADER ────────────────────────────────────────────────────────
 async def download_image(url: str) -> bytes | None:
-    """
-    Download image from URL and return raw bytes.
-    Uses a browser-like User-Agent to bypass CDN restrictions (Zee5, Hotstar etc.)
-    """
+    """Download image with browser UA to bypass CDN restrictions."""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -146,7 +245,7 @@ async def download_image(url: str) -> bytes | None:
                 resp.raise_for_status()
                 return await resp.read()
     except Exception as e:
-        log.error("Image download failed (%s): %s", url, e)
+        log.error("Image download failed: %s", e)
     return None
 
 
@@ -166,12 +265,10 @@ async def send_poster(
 
     await thinking.delete()
 
-    # ── Error handling ──
     if not data:
         await message.reply(API_ERROR_TEXT)
         return
 
-    # API returns landscape (wide banner) as the main image — no portrait poster
     image_url = data.get("landscape")
     if not image_url:
         await message.reply(NOT_FOUND_TEXT.format(title=label))
@@ -180,12 +277,9 @@ async def send_poster(
     caption  = build_caption(data, plot_max=PLOT_MAX_CHARS)
     keyboard = build_keyboard(data)
 
-    # ── Download image bytes first (CDN URLs like Zee5 block Telegram's fetcher)
     image_bytes = await download_image(image_url)
 
     if image_bytes:
-        # ── Send as raw bytes — always works regardless of CDN restrictions ──
-        import io
         await client.send_photo(
             chat_id=message.chat.id,
             photo=io.BytesIO(image_bytes),
@@ -193,8 +287,6 @@ async def send_poster(
             reply_markup=keyboard,
         )
     else:
-        # ── Last resort: send as clickable link ──
-        from pyrogram.types import LinkPreviewOptions
         fallback = f"{caption}\n\n🖼 [View Image]({image_url})"
         await message.reply(
             fallback,
@@ -203,7 +295,9 @@ async def send_poster(
         )
 
 
-# ─── COMMAND HANDLERS ────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# USER COMMANDS
+# ════════════════════════════════════════════════════════════════════════════
 
 @app.on_message(filters.command("start") & filters.private)
 async def cmd_start(client: Client, message: Message):
@@ -226,91 +320,310 @@ async def cmd_about(client: Client, message: Message):
 
 @app.on_message(filters.command("movie") & filters.private)
 async def cmd_movie(client: Client, message: Message):
-    """
-    /movie <title> [year]
-    Uses: title + optional year → Spidy movie search
-    """
     args = message.command[1:]
     if not args:
         await message.reply(USAGE_MOVIE_TEXT)
         return
-
-    # Trailing 4-digit number = year
     if len(args) > 1 and args[-1].isdigit() and len(args[-1]) == 4:
-        title = " ".join(args[:-1])
-        year  = args[-1]
+        title, year = " ".join(args[:-1]), args[-1]
     else:
-        title = " ".join(args)
-        year  = None
-
+        title, year = " ".join(args), None
     await send_poster(client, message, title=title, year=year)
 
 
 @app.on_message(filters.command("tv") & filters.private)
 async def cmd_tv(client: Client, message: Message):
-    """
-    /tv <title> [season]
-    Uses: title + optional season number → Spidy TV search
-    """
     args = message.command[1:]
     if not args:
         await message.reply(USAGE_TV_TEXT)
         return
-
-    # Trailing number = season
     if len(args) > 1 and args[-1].isdigit():
-        title  = " ".join(args[:-1])
-        season = args[-1]
+        title, season = " ".join(args[:-1]), args[-1]
     else:
-        title  = " ".join(args)
-        season = None
-
+        title, season = " ".join(args), None
     await send_poster(client, message, title=title, season=season)
 
 
 @app.on_message(filters.command("query") & filters.private)
 async def cmd_query(client: Client, message: Message):
-    """
-    /query <filename>
-    Uses: Spidy filename parser — e.g. Asur.S02.1080p.mkv
-    """
     args = message.command[1:]
     if not args:
         await message.reply(USAGE_QUERY_TEXT)
         return
-
-    query = " ".join(args)
-    await send_poster(client, message, query=query)
+    await send_poster(client, message, query=" ".join(args))
 
 
 @app.on_message(filters.command("search") & filters.private)
 async def cmd_search(client: Client, message: Message):
-    """
-    /search <title>
-    Uses: title only → Spidy general search (auto-detects movie/TV)
-    """
     args = message.command[1:]
     if not args:
         await message.reply(USAGE_SEARCH_TEXT)
         return
-
-    title = " ".join(args)
-    await send_poster(client, message, title=title)
+    await send_poster(client, message, title=" ".join(args))
 
 
 @app.on_message(
-    filters.private
-    & filters.text
-    & ~filters.command(["start", "help", "about", "movie", "tv", "query", "search"])
+    filters.private & filters.text
+    & ~filters.command(["start","help","about","movie","tv","query","search",
+                        "addadmin","deladmin","admins","ban","unban","banned",
+                        "stats","broadcast","addfsub","delfsub","listfsub"])
 )
 async def plain_search(client: Client, message: Message):
-    """Any plain text → quick title search."""
     title = message.text.strip()
     if title:
         await send_poster(client, message, title=title)
 
 
+# ════════════════════════════════════════════════════════════════════════════
+# ADMIN COMMANDS
+# ════════════════════════════════════════════════════════════════════════════
+
+@app.on_message(filters.command("stats") & filters.private)
+async def cmd_stats(client: Client, message: Message):
+    if not await is_admin(message.from_user.id):
+        return await message.reply("⛔ Admins only.")
+
+    total   = await db.total_users()
+    banned  = len(await db.get_banned_users())
+    admins  = await db.get_all_admins()
+
+    await message.reply(
+        f"📊 **Bot Statistics**\n\n"
+        f"👥 Total Users: `{total}`\n"
+        f"🚫 Banned Users: `{banned}`\n"
+        f"👮 DB Admins: `{len(admins)}`\n"
+        f"🔑 Static Admins: `{len(ADMIN_IDS)}`"
+    )
+
+
+@app.on_message(filters.command("admins") & filters.private)
+async def cmd_admins(client: Client, message: Message):
+    if not await is_admin(message.from_user.id):
+        return await message.reply("⛔ Admins only.")
+
+    db_admins = await db.get_all_admins()
+    all_admins = list(set([OWNER_ID] + ADMIN_IDS + db_admins))
+
+    lines = ["👮 **Admin List**\n"]
+    for uid in all_admins:
+        tag = " 👑 Owner" if uid == OWNER_ID else ""
+        lines.append(f"• `{uid}`{tag}")
+    await message.reply("\n".join(lines))
+
+
+@app.on_message(filters.command("addadmin") & filters.private)
+async def cmd_addadmin(client: Client, message: Message):
+    if message.from_user.id != OWNER_ID:
+        return await message.reply("⛔ Owner only.")
+
+    args = message.command[1:]
+    if not args or not args[0].isdigit():
+        return await message.reply("Usage: `/addadmin <user_id>`")
+
+    user_id = int(args[0])
+    if user_id == OWNER_ID:
+        return await message.reply("That's already the owner.")
+
+    await db.add_admin(user_id)
+    await message.reply(f"✅ `{user_id}` added as admin.")
+
+
+@app.on_message(filters.command("deladmin") & filters.private)
+async def cmd_deladmin(client: Client, message: Message):
+    if message.from_user.id != OWNER_ID:
+        return await message.reply("⛔ Owner only.")
+
+    args = message.command[1:]
+    if not args or not args[0].isdigit():
+        return await message.reply("Usage: `/deladmin <user_id>`")
+
+    user_id = int(args[0])
+    if user_id == OWNER_ID:
+        return await message.reply("Cannot remove the owner.")
+
+    await db.del_admin(user_id)
+    await message.reply(f"✅ `{user_id}` removed from admins.")
+
+
+@app.on_message(filters.command("ban") & filters.private)
+async def cmd_ban(client: Client, message: Message):
+    if not await is_admin(message.from_user.id):
+        return await message.reply("⛔ Admins only.")
+
+    args = message.command[1:]
+    if not args or not args[0].isdigit():
+        return await message.reply("Usage: `/ban <user_id>`")
+
+    user_id = int(args[0])
+    if user_id == OWNER_ID:
+        return await message.reply("Cannot ban the owner.")
+    if await is_admin(user_id):
+        return await message.reply("Cannot ban an admin.")
+
+    await db.ban_user(user_id)
+    await message.reply(f"🚫 `{user_id}` has been banned.")
+
+
+@app.on_message(filters.command("unban") & filters.private)
+async def cmd_unban(client: Client, message: Message):
+    if not await is_admin(message.from_user.id):
+        return await message.reply("⛔ Admins only.")
+
+    args = message.command[1:]
+    if not args or not args[0].isdigit():
+        return await message.reply("Usage: `/unban <user_id>`")
+
+    user_id = int(args[0])
+    await db.unban_user(user_id)
+    await message.reply(f"✅ `{user_id}` has been unbanned.")
+
+
+@app.on_message(filters.command("banned") & filters.private)
+async def cmd_banned(client: Client, message: Message):
+    if not await is_admin(message.from_user.id):
+        return await message.reply("⛔ Admins only.")
+
+    banned = await db.get_banned_users()
+    if not banned:
+        return await message.reply("✅ No banned users.")
+
+    lines = ["🚫 **Banned Users**\n"]
+    for uid in banned:
+        lines.append(f"• `{uid}`")
+    await message.reply("\n".join(lines))
+
+
+@app.on_message(filters.command("broadcast") & filters.private)
+async def cmd_broadcast(client: Client, message: Message):
+    if not await is_admin(message.from_user.id):
+        return await message.reply("⛔ Admins only.")
+
+    if not message.reply_to_message:
+        return await message.reply(
+            "Reply to a message with `/broadcast` to send it to all users."
+        )
+
+    status = await message.reply("📢 Broadcasting…")
+    users  = await db.get_all_users()
+
+    done, failed = 0, 0
+    for user_id in users:
+        try:
+            await message.reply_to_message.copy(user_id)
+            done += 1
+        except Exception:
+            failed += 1
+        await asyncio.sleep(0.05)   # avoid flood limits
+
+    await status.edit(
+        f"📢 **Broadcast Complete**\n\n"
+        f"✅ Sent: `{done}`\n"
+        f"❌ Failed: `{failed}`\n"
+        f"👥 Total: `{len(users)}`"
+    )
+
+
+# ─── FORCE SUBSCRIBE COMMANDS ───────────────────────────────────────────────
+
+@app.on_message(filters.command("addfsub") & filters.private)
+async def cmd_addfsub(client: Client, message: Message):
+    """
+    /addfsub <channel_id>
+    Bot must be admin in the channel with invite link permission.
+    """
+    if not await is_admin(message.from_user.id):
+        return await message.reply("⛔ Admins only.")
+
+    args = message.command[1:]
+    if not args:
+        return await message.reply(USAGE_ADDFSUB)
+
+    raw = args[0].lstrip("-")
+    if not raw.isdigit():
+        return await message.reply("❌ Invalid channel ID. Must be a number like `-1001234567890`")
+
+    channel_id = int(args[0])
+
+    # Verify bot is admin in that channel
+    try:
+        chat = await client.get_chat(channel_id)
+        bot_member = await client.get_chat_member(channel_id, "me")
+        if bot_member.status.value not in ("administrator", "creator"):
+            return await message.reply(
+                "❌ Bot is not an admin in that channel.
+"
+                "Make the bot an admin with **Invite Users** permission first."
+            )
+    except Exception as e:
+        return await message.reply(f"❌ Could not access channel: `{e}`")
+
+    await db.add_fsub_channel(channel_id)
+    await message.reply(
+        f"✅ **{chat.title}** added to force subscribe list.
+"
+        f"Channel ID: `{channel_id}`"
+    )
+
+
+@app.on_message(filters.command("delfsub") & filters.private)
+async def cmd_delfsub(client: Client, message: Message):
+    if not await is_admin(message.from_user.id):
+        return await message.reply("⛔ Admins only.")
+
+    args = message.command[1:]
+    if not args:
+        return await message.reply(USAGE_DELFSUB)
+
+    raw = args[0].lstrip("-")
+    if not raw.isdigit():
+        return await message.reply("❌ Invalid channel ID.")
+
+    channel_id = int(args[0])
+    if not await db.fsub_channel_exists(channel_id):
+        return await message.reply("❌ That channel is not in the fsub list.")
+
+    await db.remove_fsub_channel(channel_id)
+    await message.reply(f"✅ Channel `{channel_id}` removed from force subscribe list.")
+
+
+@app.on_message(filters.command("listfsub") & filters.private)
+async def cmd_listfsub(client: Client, message: Message):
+    if not await is_admin(message.from_user.id):
+        return await message.reply("⛔ Admins only.")
+
+    channels = await db.get_fsub_channels()
+    if not channels:
+        return await message.reply("📭 No force subscribe channels set.")
+
+    lines = ["📋 **Force Subscribe Channels**
+"]
+    for ch_id in channels:
+        try:
+            chat = await client.get_chat(ch_id)
+            lines.append(f"• **{chat.title}** — `{ch_id}`")
+        except Exception:
+            lines.append(f"• `{ch_id}` _(could not fetch name)_")
+
+    await message.reply("
+".join(lines))
+
+
 # ─── CALLBACK QUERY HANDLERS ─────────────────────────────────────────────────
+
+@app.on_callback_query(filters.regex("^check_fsub$"))
+async def cb_check_fsub(client: Client, query: CallbackQuery):
+    """User taps 'I've Joined' — re-verify all channels."""
+    user_id = query.from_user.id
+    joined, missing = await check_fsub(client, user_id)
+
+    if joined:
+        await query.edit_message_text(FSUB_JOINED)
+        await query.answer("✅ Verified!", show_alert=False)
+    else:
+        text, keyboard = build_fsub_message(missing)
+        await query.edit_message_text(text, reply_markup=keyboard)
+        await query.answer(FSUB_STILL_NOT_JOINED, show_alert=True)
+
 
 @app.on_callback_query(filters.regex("^start$"))
 async def cb_start(client: Client, query: CallbackQuery):
