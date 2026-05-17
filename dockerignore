@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pycache
+
+# Env & secrets
+.env
+*.session
+*.session-journal
+
+# Docs
+README.md
+*.md
+
+# Docker itself
+Dockerfile
+.dockerignore
+generate_session.py
+DEPLOY.md
+koyeb.yaml
+Procfile
+docker-compose.yml

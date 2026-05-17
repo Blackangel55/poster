@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  bot:
+    build: .
+    container_name: ott_poster_bot
+    restart: unless-stopped
+
+    # Load secrets from your .env file
+    env_file:
+      - .env
+
+    # Persist the Kurigram session across restarts
+    volumes:
+      - sessions:/app/sessions
+
+    # Optional: auto-restart on crash with backoff
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+volumes:
+  sessions:

@@ -1,0 +1,46 @@
+# ─── Build Stage ─────────────────────────────────────────────────────────────
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# ─── Runtime Stage ───────────────────────────────────────────────────────────
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY --from=builder /install /usr/local
+COPY bot.py config.py ./
+
+# Non-root user for security
+RUN useradd -m botuser
+USER botuser
+
+# Kurigram session persisted in a volume
+VOLUME ["/app/sessions"]
+
+# ─── Environment Variables ───────────────────────────────────────────────────
+ENV API_ID=""
+ENV API_HASH=""
+ENV BOT_TOKEN=""
+ENV SPIDY_KEY=""
+ENV SPIDY_BASE="https://api.spidyposter.com/v1/fetch"
+ENV SESSION_NAME="/app/sessions/ott_poster_bot"
+ENV PLOT_MAX_CHARS="280"
+ENV API_TIMEOUT="15"
+ENV KEEP_ALIVE="true"
+ENV PORT="8000"
+
+# Expose Flask health-check port (required by Koyeb & Render)
+EXPOSE 8000
+
+# ─── Healthcheck ─────────────────────────────────────────────────────────────
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+CMD ["python", "bot.py"]
