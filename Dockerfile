@@ -23,12 +23,12 @@ COPY --from=builder /install /usr/local
 # Copy bot source files
 COPY bot.py config.py script.py ./
 
-# Non-root user for security
-RUN useradd -m botuser
-USER botuser
+# Create session directory and set permissions BEFORE switching to non-root
+RUN mkdir -p /app/sessions && chmod 777 /app/sessions
 
-# Kurigram session persisted in a volume
-VOLUME ["/app/sessions"]
+# Non-root user for security
+RUN useradd -m botuser && chown -R botuser:botuser /app
+USER botuser
 
 # ─── Environment Variables ───────────────────────────────────────────────────
 ENV API_ID=""
