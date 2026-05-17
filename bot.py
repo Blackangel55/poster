@@ -1,31 +1,3 @@
-"""
-OTT Poster Bot — powered by Kurigram (Pyrogram fork)
-Fetches movie & TV show posters using the Spidy Poster API.
-
-Commands (users):
-  /start          – Welcome message
-  /help           – Help & tips
-  /about          – About this bot
-  /movie RRR 2022 – Movie poster
-  /tv Asur 2      – TV season poster
-  /query filename – Filename parser search
-  /search title   – General search
-  plain text      – Quick search
-
-Commands (owner/admin):
-  /addadmin <id>  – Add an admin
-  /deladmin <id>  – Remove an admin
-  /admins         – List all admins
-  /ban <id>       – Ban a user
-  /unban <id>     – Unban a user
-  /banned         – List banned users
-  /stats          – Bot statistics
-  /broadcast      – Broadcast a message to all users (reply to a message)
-  /addfsub <id>   – Add a force subscribe channel
-  /delfsub <id>   – Remove a force subscribe channel
-  /listfsub       – List all force subscribe channels
-"""
-
 import io
 import os
 import asyncio
@@ -540,7 +512,7 @@ async def cmd_addfsub(client: Client, message: Message):
 
     raw = args[0].lstrip("-")
     if not raw.isdigit():
-        return await message.reply("❌ Invalid channel ID. Must be a number like `-1001234567890`")
+        return await message.reply("❌ Invalid channel ID. Must be a number")
 
     channel_id = int(args[0])
 
