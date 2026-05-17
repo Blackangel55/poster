@@ -1,9 +1,18 @@
 """
-script.py — All bot messages, captions, and command texts for OTT Poster Bot.
-Edit this file to customise every message the bot sends without touching bot.py.
+script.py — All bot messages, captions, and keyboards for OTT Poster Bot.
+Edit this file to customise every message without touching bot.py.
+
+Spidy API response fields used:
+  title     → Movie/show title
+  year      → Release year
+  type      → "movie" or "tv"
+  season    → e.g. "Season 2"
+  poster    → Portrait poster URL
+  landscape → Wide/banner image URL
 """
 
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # START MESSAGE
@@ -11,24 +20,23 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 START_TEXT = """🎬 **Welcome to OTT Poster Bot!**
 
-Hey {first_name}! 👋  
-I fetch beautiful **movie & TV show posters** with full details — \
-ratings, genres, plot and more — powered by the Spidy Poster API.
+Hey {first_name}! 👋
+I fetch **movie & TV show posters** instantly using the Spidy Poster API.
 
 ━━━━━━━━━━━━━━━━━━━━
 📌 **Commands**
 ━━━━━━━━━━━━━━━━━━━━
 
 🎬 `/movie Title [Year]`
-   Fetch a movie poster
    _Example:_ `/movie RRR 2022`
 
 📺 `/tv Title [Season]`
-   Fetch a TV show / OTT series poster
    _Example:_ `/tv Asur 2`
 
+🗂 `/query Filename`
+   _Example:_ `/query Asur.S02.1080p.mkv`
+
 🔍 `/search Title`
-   Auto-detect movie or series
    _Example:_ `/search Mirzapur`
 
 💡 `/help` — Full help & tips
@@ -40,8 +48,8 @@ Or just **type any title** to quick-search! 🚀
 
 START_BUTTONS = InlineKeyboardMarkup([
     [
-        InlineKeyboardButton("🔍 Search a Movie", switch_inline_query_current_chat=""),
-        InlineKeyboardButton("📺 Search a Series", switch_inline_query_current_chat="tv "),
+        InlineKeyboardButton("🎬 Movie", switch_inline_query_current_chat="movie "),
+        InlineKeyboardButton("📺 TV Series", switch_inline_query_current_chat="tv "),
     ],
     [
         InlineKeyboardButton("💡 Help", callback_data="help"),
@@ -57,50 +65,57 @@ START_BUTTONS = InlineKeyboardMarkup([
 HELP_TEXT = """💡 **OTT Poster Bot — Help**
 
 ━━━━━━━━━━━━━━━━━━━━
-🎬 **Movie Poster**
+🎬 **Movie Search**
 ━━━━━━━━━━━━━━━━━━━━
 `/movie <Title>`
 `/movie <Title> <Year>`
 
-Examples:
 • `/movie Bahubali`
 • `/movie RRR 2022`
 • `/movie The Dark Knight 2008`
 
 ━━━━━━━━━━━━━━━━━━━━
-📺 **TV / OTT Series Poster**
+📺 **TV / OTT Series**
 ━━━━━━━━━━━━━━━━━━━━
 `/tv <Title>`
 `/tv <Title> <Season>`
 
-Examples:
 • `/tv Mirzapur`
 • `/tv Asur 2`
 • `/tv Sacred Games 1`
 
 ━━━━━━━━━━━━━━━━━━━━
-🔍 **Auto Search**
+🗂 **Filename Search**
+━━━━━━━━━━━━━━━━━━━━
+`/query <Filename>`
+_Auto-parses season, year, quality from filename._
+
+• `/query Asur.S02.1080p.mkv`
+• `/query RRR.2022.BluRay.mkv`
+• `/query Sacred.Games.S01E03.mkv`
+
+━━━━━━━━━━━━━━━━━━━━
+🔍 **General Search**
 ━━━━━━━━━━━━━━━━━━━━
 `/search <Title>`
-_Tries movie first, falls back to TV show._
+_Auto-detects movie or TV show._
 
-Examples:
 • `/search Pushpa`
 • `/search Family Man`
 
 ━━━━━━━━━━━━━━━━━━━━
 ⚡ **Quick Search**
 ━━━━━━━━━━━━━━━━━━━━
-Just **type any title** without a command!
+Just **type any title** — no command needed!
 
 • `KGF Chapter 2`
 • `Scam 1992`
 
 ━━━━━━━━━━━━━━━━━━━━
 💬 **Tips**
-• Include the year for better accuracy on popular titles.
-• For season-specific posters, always add the season number.
-• Partial titles work too — try `KGF` instead of the full name.
+• Add year for accuracy: `/movie KGF 2022`
+• Add season for specific poster: `/tv Asur 2`
+• Use `/query` if you have a filename — it's the most accurate!
 """
 
 HELP_BUTTONS = InlineKeyboardMarkup([
@@ -121,11 +136,11 @@ ABOUT_TEXT = """ℹ️ **About OTT Poster Bot**
 🐍 **Language:** Python 3.12
 ━━━━━━━━━━━━━━━━━━━━
 
-This bot fetches high-quality movie and OTT series posters \
-along with details like ratings ⭐, genres 🏷, runtime 🕐, \
-and plot summaries 📝 — all in one tap.
+Fetches high-quality **movie & OTT series posters** \
+with portrait and landscape images.
 
-Built for cinephiles and binge-watchers. 🎬📺
+Supports searching by title, year, season, or even \
+a raw filename like `Asur.S02.1080p.mkv`. 🎬📺
 """
 
 ABOUT_BUTTONS = InlineKeyboardMarkup([
@@ -134,127 +149,119 @@ ABOUT_BUTTONS = InlineKeyboardMarkup([
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# SEARCHING / LOADING MESSAGE
+# STATUS MESSAGES
 # ════════════════════════════════════════════════════════════════════════════
 
 SEARCHING_TEXT = "🔍 Searching for **{title}**…"
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# ERROR MESSAGES
-# ════════════════════════════════════════════════════════════════════════════
 
 NOT_FOUND_TEXT = """❌ **No results found for:** `{title}`
 
 Try:
 • Check the spelling
-• Add the release year: `/movie {title} 2023`
+• Add year: `/movie {title} 2023`
 • For a series: `/tv {title}`
-• Use `/search {title}` for auto-detect
+• Use filename: `/query {title}.S01.mkv`
 """
 
-API_ERROR_TEXT = """⚠️ **Could not reach the poster API.**
+API_ERROR_TEXT = """⚠️ **Could not reach the Spidy API.**
 
 Please try again in a moment.
-If the issue persists, the API may be down temporarily.
 """
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# USAGE / EMPTY COMMAND MESSAGES
+# ════════════════════════════════════════════════════════════════════════════
 
 USAGE_MOVIE_TEXT = """ℹ️ **Usage:** `/movie Title [Year]`
 
-Examples:
-• `/movie Bahubali`
 • `/movie RRR 2022`
+• `/movie Bahubali`
 """
 
 USAGE_TV_TEXT = """ℹ️ **Usage:** `/tv Title [Season]`
 
-Examples:
-• `/tv Mirzapur`
 • `/tv Asur 2`
+• `/tv Mirzapur`
+"""
+
+USAGE_QUERY_TEXT = """ℹ️ **Usage:** `/query Filename`
+
+Parses season, year, quality automatically from the filename.
+
+• `/query Asur.S02.1080p.mkv`
+• `/query RRR.2022.BluRay.mkv`
 """
 
 USAGE_SEARCH_TEXT = """ℹ️ **Usage:** `/search Title`
 
-Examples:
 • `/search Pushpa`
 • `/search Family Man`
 """
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# POSTER CAPTION BUILDER
+# CAPTION BUILDER
 # ════════════════════════════════════════════════════════════════════════════
 
-def build_caption(data: dict, is_season: bool = False, plot_max: int = 280) -> str:
+def build_caption(data: dict, plot_max: int = 280) -> str:
     """
-    Build a rich Markdown caption from the Spidy API response dict.
-    All field names have fallbacks to cover API variations.
+    Build a Markdown caption from Spidy API response.
+
+    Spidy response fields:
+      title    → str
+      year     → int
+      type     → "movie" | "tv"
+      season   → "Season 2" (string, not int)
+      poster   → URL
+      landscape → URL
     """
-    title   = data.get("title") or data.get("name", "Unknown")
-    year    = data.get("year") or data.get("release_year", "")
-    rating  = data.get("rating") or data.get("imdb_rating", "")
-    genres  = data.get("genres") or data.get("genre", [])
-    plot    = data.get("plot") or data.get("overview", "")
-    season  = data.get("season", "")
-    network = data.get("network") or data.get("platform", "")
-    runtime = data.get("runtime") or data.get("episode_runtime", "")
-    language = data.get("language") or data.get("original_language", "")
-    country  = data.get("country") or data.get("production_country", "")
+    title   = data.get("title", "Unknown")
+    year    = data.get("year", "")
+    kind    = data.get("type", "")          # "movie" or "tv"
+    season  = data.get("season", "")        # "Season 2"
 
     lines = []
 
-    # ── Title line ──
-    if is_season and season:
-        lines.append(f"📺 **{title}** — Season {season}")
+    # ── Title + type icon ──
+    icon = "📺" if kind == "tv" else "🎬"
+
+    if kind == "tv" and season:
+        lines.append(f"{icon} **{title}** — {season}")
     elif year:
-        lines.append(f"🎬 **{title}** ({year})")
+        lines.append(f"{icon} **{title}** ({year})")
     else:
-        lines.append(f"🎬 **{title}**")
+        lines.append(f"{icon} **{title}**")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━")
 
-    # ── Meta row ──
-    meta = []
-    if rating:
-        meta.append(f"⭐ {rating}/10")
-    if runtime:
-        meta.append(f"🕐 {runtime} min")
-    if network:
-        meta.append(f"📡 {network}")
-    if meta:
-        lines.append("  |  ".join(meta))
-
-    # ── Genres ──
-    if genres:
-        tag = genres if isinstance(genres, str) else " · ".join(genres)
-        lines.append(f"🏷 {tag}")
-
-    # ── Language / Country ──
-    info = []
-    if language:
-        info.append(f"🌐 {language.title()}")
-    if country:
-        info.append(f"🗺 {country}")
-    if info:
-        lines.append("  |  ".join(info))
-
-    # ── Plot ──
-    if plot:
-        short = (plot[:plot_max] + "…") if len(plot) > plot_max else plot
-        lines.append(f"\n📝 _{short}_")
+    # ── Type badge ──
+    if kind:
+        badge = "🎬 Movie" if kind == "movie" else "📺 TV Series"
+        lines.append(badge)
 
     return "\n".join(lines)
 
 
-def build_keyboard(data: dict) -> InlineKeyboardMarkup | None:
-    """Build inline buttons for IMDb and Trailer links if present."""
+# ════════════════════════════════════════════════════════════════════════════
+# KEYBOARD BUILDER
+# ════════════════════════════════════════════════════════════════════════════
+
+def build_keyboard(
+    data: dict,
+    landscape_url: str = None,
+) -> InlineKeyboardMarkup | None:
+    """
+    Build inline buttons from Spidy API response.
+    Shows a 'View Landscape' button if the API returns a landscape image.
+    """
     buttons = []
-    if data.get("imdb_id"):
+
+    # Landscape / banner image button
+    landscape = landscape_url or data.get("landscape")
+    if landscape:
         buttons.append(
-            InlineKeyboardButton("🎞 IMDb", url=f"https://www.imdb.com/title/{data['imdb_id']}")
+            InlineKeyboardButton("🖼 Landscape Poster", url=landscape)
         )
-    if data.get("trailer"):
-        buttons.append(
-            InlineKeyboardButton("▶️ Trailer", url=data["trailer"])
-        )
+
     return InlineKeyboardMarkup([buttons]) if buttons else None
