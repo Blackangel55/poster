@@ -121,14 +121,20 @@ async def fetch_poster(
             ) as resp:
                 resp.raise_for_status()
                 data = await resp.json()
+                log.info("Spidy API raw response: %s", data)
+
+                # API returns {"results": [...]} — pick the first match
+                results = data.get("results", [])
+                if not results:
+                    log.warning("Spidy API returned empty results for: %s", title or query)
+                    return None
+
+                result = results[0]
                 log.info(
-                    "Spidy API → title=%s year=%s season=%s query=%s | type=%s",
-                    title, year, season, query,
-                    data.get("type", "?"),
+                    "Spidy API → title=%s year=%s season=%s query=%s | result=%s",
+                    title, year, season, query, result,
                 )
-                # Full response dump — remove after debugging
-                log.info("Spidy API full response: %s", data)
-                return data
+                return result
     except aiohttp.ClientResponseError as e:
         log.error("Spidy API HTTP %s: %s", e.status, e.message)
     except aiohttp.ClientError as e:
@@ -159,26 +165,26 @@ async def send_poster(
         await message.reply(API_ERROR_TEXT)
         return
 
-    if not data.get("poster"):
+    # API returns landscape (wide banner) as the main image — no portrait poster
+    image_url = data.get("landscape")
+    if not image_url:
         await message.reply(NOT_FOUND_TEXT.format(title=label))
         return
 
-    poster_url   = data["poster"]
-    landscape_url = data.get("landscape")   # bonus wide image from API
-    caption      = build_caption(data, plot_max=PLOT_MAX_CHARS)
-    keyboard     = build_keyboard(data, landscape_url=landscape_url)
+    caption  = build_caption(data, plot_max=PLOT_MAX_CHARS)
+    keyboard = build_keyboard(data)
 
-    # ── Send poster photo ──
+    # ── Send landscape image ──
     try:
         await client.send_photo(
             chat_id=message.chat.id,
-            photo=poster_url,
+            photo=image_url,
             caption=caption,
             reply_markup=keyboard,
         )
     except Exception as e:
         log.warning("send_photo failed (%s) — sending as link", e)
-        fallback = f"{caption}\n\n🖼 [View Poster]({poster_url})"
+        fallback = f"{caption}\n\n🖼 [View Image]({image_url})"
         await message.reply(
             fallback,
             reply_markup=keyboard,
