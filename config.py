@@ -1,8 +1,3 @@
-"""
-config.py — Central config for OTT Poster Bot
-Edit values here OR set environment variables (env vars take priority).
-"""
-
 import os
 
 # ─── TELEGRAM ────────────────────────────────────────────────────────────────
@@ -18,8 +13,9 @@ SPIDY_KEY  = os.getenv("SPIDY_KEY", "YOUR_SPIDY_API_KEY")
 SPIDY_BASE = os.getenv("SPIDY_BASE", "https://api.spidyposter.com/v1/fetch")
 
 # ─── BOT SETTINGS ────────────────────────────────────────────────────────────
-# Session file name (Kurigram saves a .session file with this name)
-SESSION_NAME = os.getenv("SESSION_NAME", "ott_poster_bot")
+# Session file path — Kurigram writes a .session file here
+# In Docker this goes to /app/sessions/ott_poster_bot.session (created in Dockerfile)
+SESSION_NAME = os.getenv("SESSION_NAME", "/app/sessions/ott_poster_bot")
 
 # Max characters for plot/overview in captions
 PLOT_MAX_CHARS = int(os.getenv("PLOT_MAX_CHARS", "280"))
