@@ -378,7 +378,12 @@ async def cmd_help(client: Client, message: Message):
 
 @app.on_message(filters.command("about") & filters.private)
 async def cmd_about(client: Client, message: Message):
-    await message.reply(ABOUT_TEXT, reply_markup=ABOUT_BUTTONS)
+    me = await client.get_me()
+    await message.reply(
+        ABOUT_TEXT.format(me.first_name),
+        reply_markup=ABOUT_BUTTONS,
+        parse_mode="html",
+    )
 
 
 @app.on_message(filters.command("movie") & filters.private)
@@ -702,7 +707,12 @@ async def cb_help(client: Client, query: CallbackQuery):
 
 @app.on_callback_query(filters.regex("^about$"))
 async def cb_about(client: Client, query: CallbackQuery):
-    await query.edit_message_text(ABOUT_TEXT, reply_markup=ABOUT_BUTTONS)
+    me = await client.get_me()
+    await query.edit_message_text(
+        ABOUT_TEXT.format(me.first_name),
+        reply_markup=ABOUT_BUTTONS,
+        parse_mode="html",
+    )
     await query.answer()
 
 
