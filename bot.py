@@ -1,3 +1,31 @@
+"""
+OTT Poster Bot — powered by Kurigram (Pyrogram fork)
+Fetches movie & TV show posters using the Spidy Poster API.
+
+Commands (users):
+  /start          – Welcome message
+  /help           – Help & tips
+  /about          – About this bot
+  /movie RRR 2022 – Movie poster
+  /tv Asur 2      – TV season poster
+  /query filename – Filename parser search
+  /search title   – General search
+  plain text      – Quick search
+
+Commands (owner/admin):
+  /addadmin <id>  – Add an admin
+  /deladmin <id>  – Remove an admin
+  /admins         – List all admins
+  /ban <id>       – Ban a user
+  /unban <id>     – Unban a user
+  /banned         – List banned users
+  /stats          – Bot statistics
+  /broadcast      – Broadcast a message to all users (reply to a message)
+  /addfsub <id>   – Add a force subscribe channel
+  /delfsub <id>   – Remove a force subscribe channel
+  /listfsub       – List all force subscribe channels
+"""
+
 import io
 import os
 import asyncio
@@ -512,7 +540,7 @@ async def cmd_addfsub(client: Client, message: Message):
 
     raw = args[0].lstrip("-")
     if not raw.isdigit():
-        return await message.reply("❌ Invalid channel ID. Must be a number")
+        return await message.reply("❌ Invalid channel ID. Must be a number like `-1001234567890`")
 
     channel_id = int(args[0])
 
@@ -522,8 +550,7 @@ async def cmd_addfsub(client: Client, message: Message):
         bot_member = await client.get_chat_member(channel_id, "me")
         if bot_member.status.value not in ("administrator", "creator"):
             return await message.reply(
-                "❌ Bot is not an admin in that channel.
-"
+                "❌ Bot is not an admin in that channel.\n"
                 "Make the bot an admin with **Invite Users** permission first."
             )
     except Exception as e:
@@ -531,8 +558,7 @@ async def cmd_addfsub(client: Client, message: Message):
 
     await db.add_fsub_channel(channel_id)
     await message.reply(
-        f"✅ **{chat.title}** added to force subscribe list.
-"
+        f"✅ **{chat.title}** added to force subscribe list.\n"
         f"Channel ID: `{channel_id}`"
     )
 
@@ -567,8 +593,7 @@ async def cmd_listfsub(client: Client, message: Message):
     if not channels:
         return await message.reply("📭 No force subscribe channels set.")
 
-    lines = ["📋 **Force Subscribe Channels**
-"]
+    lines = ["📋 **Force Subscribe Channels**\n"]
     for ch_id in channels:
         try:
             chat = await client.get_chat(ch_id)
@@ -576,8 +601,7 @@ async def cmd_listfsub(client: Client, message: Message):
         except Exception:
             lines.append(f"• `{ch_id}` _(could not fetch name)_")
 
-    await message.reply("
-".join(lines))
+    await message.reply("\n".join(lines))
 
 
 # ─── CALLBACK QUERY HANDLERS ─────────────────────────────────────────────────
