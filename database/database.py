@@ -1,8 +1,3 @@
-"""
-database.py — MongoDB database handler for OTT Poster Bot
-Uses motor (async MongoDB driver) for non-blocking DB operations.
-"""
-
 import logging
 import motor.motor_asyncio
 
@@ -135,14 +130,19 @@ class Database:
         )
         log.info("Image cached: hash=%s file_id=%s", url_hash, file_id)
 
-    async def update_file_id(self, url_hash: str, file_id: str):
-        """Save Telegram file_id after first upload so future sends skip download."""
-        await self.image_cache.update_one(
-            {"_id": url_hash},
-            {"$set": {"file_id": file_id}},
-            upsert=False,
-        )
-        log.info("file_id saved for hash=%s", url_hash)
+    async def update_file_id(self, url_hash: str, file_id: str | None):
+        """Save or clear Telegram file_id. Pass None to unset an expired file_id."""
+        if file_id:
+            update = {"$set": {"file_id": file_id}}
+        else:
+            update = {"$unset": {"file_id": ""}}
+        await self.image_cache.update_one({"_id": url_hash}, update, upsert=False)
+        log.info("file_id %s for hash=%s", "saved" if file_id else "cleared", url_hash)
+
+    async def clear_cache(self, url_hash: str):
+        """Delete a cache entry entirely (e.g. when cached bytes are invalid)."""
+        await self.image_cache.delete_one({"_id": url_hash})
+        log.info("Cache entry cleared: hash=%s", url_hash)
 
 
 # ─── SINGLETON ───────────────────────────────────────────────────────────────
