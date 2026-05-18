@@ -7,6 +7,7 @@ import logging
 import aiohttp
 
 from pyrogram import Client, filters, enums
+from pyrogram.types import BotCommand
 from pyrogram.types import (
     CallbackQuery,
     LinkPreviewOptions,
@@ -785,11 +786,77 @@ def _run_health_server():
     _health_app.run(host="0.0.0.0", port=port, use_reloader=False)
 
 
+# ─── BOT COMMANDS REGISTRATION ───────────────────────────────────────────────
+USER_COMMANDS = [
+    BotCommand("start",  "Welcome message"),
+    BotCommand("help",   "Full help & tips"),
+    BotCommand("about",  "About this bot"),
+    BotCommand("movie",  "Fetch a movie poster — /movie RRR 2022"),
+    BotCommand("tv",     "Fetch a TV season poster — /tv Asur 2"),
+    BotCommand("query",  "Search by filename — /query Asur.S02.1080p.mkv"),
+    BotCommand("search", "Auto-detect movie or series — /search Mirzapur"),
+]
+
+ADMIN_COMMANDS = USER_COMMANDS + [
+    BotCommand("stats",     "Bot statistics"),
+    BotCommand("admins",    "List all admins"),
+    BotCommand("ban",       "Ban a user — /ban user_id"),
+    BotCommand("unban",     "Unban a user — /unban user_id"),
+    BotCommand("banned",    "List banned users"),
+    BotCommand("broadcast", "Broadcast to all users (reply to a message)"),
+    BotCommand("addfsub",   "Add force subscribe channel — /addfsub -100xxx"),
+    BotCommand("delfsub",   "Remove force subscribe channel — /delfsub -100xxx"),
+    BotCommand("listfsub",  "List force subscribe channels"),
+    BotCommand("addadmin",  "Add an admin — /addadmin user_id"),
+    BotCommand("deladmin",  "Remove an admin — /deladmin user_id"),
+]
+
+
+@app.on_message(filters.command("start") & filters.private, group=-2)
+async def _auto_set_commands(client: Client, message: Message):
+    """Set bot commands once on first /start after deploy. Runs in background."""
+    pass  # handled below via on_start
+
+
+async def set_commands(client: Client):
+    """Register commands in Telegram so they appear in the bot menu."""
+    try:
+        # Default commands for all users
+        await client.set_bot_commands(USER_COMMANDS)
+
+        # Admin-scoped commands for owner
+        if OWNER_ID:
+            from pyrogram.types import BotCommandScopeChat
+            await client.set_bot_commands(
+                ADMIN_COMMANDS,
+                scope=BotCommandScopeChat(chat_id=OWNER_ID),
+            )
+
+        # Admin-scoped commands for each static admin
+        for admin_id in ADMIN_IDS:
+            try:
+                from pyrogram.types import BotCommandScopeChat
+                await client.set_bot_commands(
+                    ADMIN_COMMANDS,
+                    scope=BotCommandScopeChat(chat_id=admin_id),
+                )
+            except Exception:
+                pass
+
+        log.info("Bot commands registered successfully")
+    except Exception as e:
+        log.error("Failed to set bot commands: %s", e)
+
+
 # ─── RUN ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     keep_alive = os.getenv("KEEP_ALIVE", "true").lower() == "true"
     if keep_alive:
         threading.Thread(target=_run_health_server, daemon=True).start()
 
+    async def on_start(client):
+        await set_commands(client)
+
+    app.on_connect()(on_start)
     log.info("Starting OTT Poster Bot…")
     app.run()
