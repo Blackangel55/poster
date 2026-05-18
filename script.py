@@ -1,16 +1,3 @@
-"""
-script.py — All bot messages, captions, and keyboards for OTT Poster Bot.
-Edit this file to customise every message without touching bot.py.
-
-Spidy API response fields used:
-  title     → Movie/show title
-  year      → Release year
-  type      → "movie" or "tv"
-  season    → e.g. "Season 2"
-  poster    → Portrait poster URL
-  landscape → Wide/banner image URL
-"""
-
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
@@ -127,14 +114,12 @@ HELP_BUTTONS = InlineKeyboardMarkup([
 # ABOUT MESSAGE
 # ════════════════════════════════════════════════════════════════════════════
 
-ABOUT_TEXT = """ℹ️ **About OTT Poster Bot**
-
-━━━━━━━━━━━━━━━━━━━━
-🤖 **Bot:** OTT Poster Bot
-🛠 **Framework:** Kurigram (Pyrogram fork)
-🎨 **Poster API:** Spidy Poster API
-🐍 **Language:** Python 3.12
-━━━━━━━━━━━━━━━━━━━━
+ABOUT_TEXT =  """<b>○ 𝖬𝗒 𝖭𝖺𝗆𝖾: {}
+○ 𝖢𝗋𝖾𝖺𝗍𝗈𝗋 : <a href='https://t.me/GUARDIANff'>𝖳𝗁𝗂𝗌 𝖯𝖾𝗋𝗌𝗈𝗇</a>
+○ 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : 𝖯𝗒𝗍𝗁𝗈𝗇 𝟥 
+○ 𝖫𝗂𝖻𝗋𝖺𝗋𝗒 : 𝖯𝗒𝗋𝗈𝗀𝗋𝖺𝗆 𝖺𝗌𝗒𝗇𝖼𝗂𝗈 𝟢.𝟣𝟩.𝟣 
+○ 𝖲𝖾𝗋𝗏𝖾𝗋 : Contabo
+○ 𝖲𝗎𝗉𝗉𝗈𝗋𝗍 𝖦𝗋𝗈𝗎𝗉 : <a href='https://t.me/AM_FILMS'>𝖳𝖺𝗉 𝖧𝖾𝗋𝖾</a>"""
 
 Fetches high-quality **movie & OTT series posters** \
 with portrait and landscape images.
@@ -152,7 +137,7 @@ ABOUT_BUTTONS = InlineKeyboardMarkup([
 # STATUS MESSAGES
 # ════════════════════════════════════════════════════════════════════════════
 
-SEARCHING_TEXT = "🔍 Searching for **{title}**…"
+SEARCHING_TEXT = """🔍 Searching for **{title}**…"""
 
 NOT_FOUND_TEXT = """❌ **No results found for:** `{title}`
 
@@ -173,13 +158,13 @@ Please try again in a moment.
 # USAGE / EMPTY COMMAND MESSAGES
 # ════════════════════════════════════════════════════════════════════════════
 
-USAGE_MOVIE_TEXT = """ℹ️ **Usage:** `/movie Title [Year]`
+USAGE_MOVIE_TEXT = """<b>ℹ️ Usage: `/movie Title [Year]`
 
 • `/movie RRR 2022`
-• `/movie Bahubali`
+• `/movie Bahubali`</b>
 """
 
-USAGE_TV_TEXT = """ℹ️ **Usage:** `/tv Title [Season]`
+USAGE_TV_TEXT = """ℹ️ Usage: `/tv Title [Season]`
 
 • `/tv Asur 2`
 • `/tv Mirzapur`
