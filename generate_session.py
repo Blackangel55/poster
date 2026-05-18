@@ -1,13 +1,3 @@
-"""
-generate_session.py
-Run this ONCE locally to generate a Pyrogram string session.
-Copy the output string and set it as SESSION_STRING env var in Koyeb.
-This avoids the ephemeral filesystem problem on free-tier cloud hosts.
-
-Usage:
-    python generate_session.py
-"""
-
 try:
     from dotenv import load_dotenv
     load_dotenv()
