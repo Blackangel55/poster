@@ -18,10 +18,11 @@ class Database:
         self.db        = self.client[db_name]
 
         # Collections
-        self.users      = self.db["users"]
-        self.banned     = self.db["banned_users"]
-        self.admins     = self.db["admins"]
-        self.fsub       = self.db["fsub_channels"]
+        self.users        = self.db["users"]
+        self.banned       = self.db["banned_users"]
+        self.admins       = self.db["admins"]
+        self.fsub         = self.db["fsub_channels"]
+        self.image_cache  = self.db["image_cache"]
 
     # ─── USER MANAGEMENT ─────────────────────────────────────────────────────
 
@@ -102,6 +103,46 @@ class Database:
     async def fsub_channel_exists(self, channel_id: int) -> bool:
         found = await self.fsub.find_one({"_id": channel_id})
         return bool(found)
+
+
+    # ─── IMAGE CACHE ─────────────────────────────────────────────────────────
+    # Stores: { _id: url_hash, url: str, file_id: str, bytes: Binary }
+    # Priority on retrieval: file_id first (fastest), then raw bytes
+
+    async def get_cached_image(self, url_hash: str) -> dict | None:
+        """Return cached doc with file_id and/or bytes, or None."""
+        return await self.image_cache.find_one({"_id": url_hash})
+
+    async def cache_image(
+        self,
+        url_hash: str,
+        url: str,
+        file_id: str = None,
+        image_bytes: bytes = None,
+    ):
+        """Insert or update cache entry for a poster image."""
+        update = {"url": url}
+        if file_id:
+            update["file_id"] = file_id
+        if image_bytes:
+            import bson
+            update["bytes"] = bson.Binary(image_bytes)
+
+        await self.image_cache.update_one(
+            {"_id": url_hash},
+            {"$set": update},
+            upsert=True,
+        )
+        log.info("Image cached: hash=%s file_id=%s", url_hash, file_id)
+
+    async def update_file_id(self, url_hash: str, file_id: str):
+        """Save Telegram file_id after first upload so future sends skip download."""
+        await self.image_cache.update_one(
+            {"_id": url_hash},
+            {"$set": {"file_id": file_id}},
+            upsert=False,
+        )
+        log.info("file_id saved for hash=%s", url_hash)
 
 
 # ─── SINGLETON ───────────────────────────────────────────────────────────────
