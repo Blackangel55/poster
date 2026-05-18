@@ -1,53 +1,108 @@
-# ─── Build Stage ─────────────────────────────────────────────────────────────
-FROM python:3.12-slim AS builder
+"""
+database.py — MongoDB database handler for OTT Poster Bot
+Uses motor (async MongoDB driver) for non-blocking DB operations.
+"""
 
-WORKDIR /app
+import logging
+import motor.motor_asyncio
 
-# TgCrypto is a C extension — needs gcc + python headers to compile
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+from config import DB_URI, DB_NAME
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+log = logging.getLogger(__name__)
 
-# ─── Runtime Stage ───────────────────────────────────────────────────────────
-FROM python:3.12-slim
 
-WORKDIR /app
+class Database:
 
-# Copy installed packages from builder
-COPY --from=builder /install /usr/local
+    def __init__(self, db_uri: str, db_name: str):
+        self.client   = motor.motor_asyncio.AsyncIOMotorClient(db_uri)
+        self.db        = self.client[db_name]
 
-# Copy bot source files
-COPY *.py ./
-COPY database/ ./database/
+        # Collections
+        self.users      = self.db["users"]
+        self.banned     = self.db["banned_users"]
+        self.admins     = self.db["admins"]
+        self.fsub       = self.db["fsub_channels"]
 
-# Create session directory and set permissions BEFORE switching to non-root
-RUN mkdir -p /app/sessions && chmod 777 /app/sessions
+    # ─── USER MANAGEMENT ─────────────────────────────────────────────────────
 
-# Non-root user for security
-RUN useradd -m botuser && chown -R botuser:botuser /app
-USER botuser
+    async def user_exists(self, user_id: int) -> bool:
+        found = await self.users.find_one({"_id": user_id})
+        return bool(found)
 
-# ─── Environment Variables ───────────────────────────────────────────────────
-ENV API_ID=""
-ENV API_HASH=""
-ENV BOT_TOKEN=""
-ENV SPIDY_KEY=""
-ENV SPIDY_BASE="https://poster-api.ispidy.com/v1/fetch"
-ENV SESSION_NAME="/app/sessions/ott_poster_bot"
-ENV PLOT_MAX_CHARS="280"
-ENV API_TIMEOUT="15"
-ENV KEEP_ALIVE="true"
-ENV PORT="8000"
+    async def add_user(self, user_id: int):
+        if not await self.user_exists(user_id):
+            await self.users.insert_one({"_id": user_id})
+            log.info("New user added: %s", user_id)
 
-# Expose Flask health-check port (required by Koyeb & Render)
-EXPOSE 8000
+    async def del_user(self, user_id: int):
+        await self.users.delete_one({"_id": user_id})
 
-# ─── Healthcheck ─────────────────────────────────────────────────────────────
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+    async def get_all_users(self) -> list[int]:
+        docs = await self.users.find().to_list(length=None)
+        return [doc["_id"] for doc in docs]
 
-CMD ["python", "bot.py"]
+    async def total_users(self) -> int:
+        return await self.users.count_documents({})
+
+    # ─── BAN MANAGEMENT ──────────────────────────────────────────────────────
+
+    async def is_banned(self, user_id: int) -> bool:
+        found = await self.banned.find_one({"_id": user_id})
+        return bool(found)
+
+    async def ban_user(self, user_id: int):
+        if not await self.is_banned(user_id):
+            await self.banned.insert_one({"_id": user_id})
+            log.info("User banned: %s", user_id)
+
+    async def unban_user(self, user_id: int):
+        await self.banned.delete_one({"_id": user_id})
+        log.info("User unbanned: %s", user_id)
+
+    async def get_banned_users(self) -> list[int]:
+        docs = await self.banned.find().to_list(length=None)
+        return [doc["_id"] for doc in docs]
+
+    # ─── ADMIN MANAGEMENT ────────────────────────────────────────────────────
+
+    async def is_admin(self, user_id: int) -> bool:
+        found = await self.admins.find_one({"_id": user_id})
+        return bool(found)
+
+    async def add_admin(self, user_id: int):
+        if not await self.is_admin(user_id):
+            await self.admins.insert_one({"_id": user_id})
+            log.info("Admin added: %s", user_id)
+
+    async def del_admin(self, user_id: int):
+        await self.admins.delete_one({"_id": user_id})
+        log.info("Admin removed: %s", user_id)
+
+    async def get_all_admins(self) -> list[int]:
+        docs = await self.admins.find().to_list(length=None)
+        return [doc["_id"] for doc in docs]
+
+
+    # ─── FORCE SUBSCRIBE CHANNELS ───────────────────────────────────────────
+
+    async def add_fsub_channel(self, channel_id: int):
+        found = await self.fsub.find_one({"_id": channel_id})
+        if not found:
+            await self.fsub.insert_one({"_id": channel_id})
+            log.info("Fsub channel added: %s", channel_id)
+
+    async def remove_fsub_channel(self, channel_id: int):
+        await self.fsub.delete_one({"_id": channel_id})
+        log.info("Fsub channel removed: %s", channel_id)
+
+    async def get_fsub_channels(self) -> list[int]:
+        docs = await self.fsub.find().to_list(length=None)
+        return [doc["_id"] for doc in docs]
+
+    async def fsub_channel_exists(self, channel_id: int) -> bool:
+        found = await self.fsub.find_one({"_id": channel_id})
+        return bool(found)
+
+
+# ─── SINGLETON ───────────────────────────────────────────────────────────────
+db = Database(DB_URI, DB_NAME)
