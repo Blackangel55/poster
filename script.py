@@ -33,60 +33,60 @@ START_BUTTONS = InlineKeyboardMarkup([
 # HELP MESSAGE
 # ════════════════════════════════════════════════════════════════════════════
 
-HELP_TEXT = """💡 **OTT Poster Bot — Help**
+HELP_TEXT = """<b>💡 **OTT Poster Bot — Help**
 
 ━━━━━━━━━━━━━━━━━━━━
 🎬 **Movie Search**
 ━━━━━━━━━━━━━━━━━━━━
-`/movie <Title>`
-`/movie <Title> <Year>`
+/movie <Title>
+/movie <Title> <Year>
 
-• `/movie Bahubali`
-• `/movie RRR 2022`
-• `/movie The Dark Knight 2008`
+• /movie Bahubali
+• /movie RRR 2022
+• /movie The Dark Knight 2008
 
 ━━━━━━━━━━━━━━━━━━━━
 📺 **TV / OTT Series**
 ━━━━━━━━━━━━━━━━━━━━
-`/tv <Title>`
-`/tv <Title> <Season>`
+/tv <Title>
+/tv <Title> <Season>
 
-• `/tv Mirzapur`
-• `/tv Asur 2`
-• `/tv Sacred Games 1`
+• /tv Mirzapur
+• /tv Asur 2
+• /tv Sacred Games 1
 
 ━━━━━━━━━━━━━━━━━━━━
 🗂 **Filename Search**
 ━━━━━━━━━━━━━━━━━━━━
-`/query <Filename>`
-_Auto-parses season, year, quality from filename._
+/query <Filename>
+Auto-parses season, year, quality from filename.
 
-• `/query Asur.S02.1080p.mkv`
-• `/query RRR.2022.BluRay.mkv`
-• `/query Sacred.Games.S01E03.mkv`
+• /query Asur.S02.1080p.mkv
+• /query RRR.2022.BluRay.mkv
+• /query Sacred.Games.S01E03.mkv
 
 ━━━━━━━━━━━━━━━━━━━━
 🔍 **General Search**
 ━━━━━━━━━━━━━━━━━━━━
-`/search <Title>`
-_Auto-detects movie or TV show._
+/search <Title>
+Auto-detects movie or TV show.
 
-• `/search Pushpa`
-• `/search Family Man`
+• /search Pushpa
+• /search Family Man
 
 ━━━━━━━━━━━━━━━━━━━━
 ⚡ **Quick Search**
 ━━━━━━━━━━━━━━━━━━━━
 Just **type any title** — no command needed!
 
-• `KGF Chapter 2`
-• `Scam 1992`
+• KGF Chapter 2
+• Scam 1992
 
 ━━━━━━━━━━━━━━━━━━━━
 💬 **Tips**
 • Add year for accuracy: `/movie KGF 2022`
 • Add season for specific poster: `/tv Asur 2`
-• Use `/query` if you have a filename — it's the most accurate!
+• Use `/query` if you have a filename — it's the most accurate!</b>
 """
 
 HELP_BUTTONS = InlineKeyboardMarkup([
@@ -101,8 +101,6 @@ HELP_BUTTONS = InlineKeyboardMarkup([
 ABOUT_TEXT = """<b>○ 𝖬𝗒 𝖭𝖺𝗆𝖾: {}
 ○ 𝖢𝗋𝖾𝖺𝗍𝗈𝗋 : <a href='https://t.me/GUARDIANff'>𝖳𝗁𝗂𝗌 𝖯𝖾𝗋𝗌𝗈𝗇</a>
 ○ 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : 𝖯𝗒𝗍𝗁𝗈𝗇 𝟥
-○ 𝖫𝗂𝖻𝗋𝖺𝗋𝗒 : 𝖪𝗎𝗋𝗂𝗀𝗋𝖺𝗆 (𝖯𝗒𝗋𝗈𝗀𝗋𝖺𝗆 𝖿𝗈𝗋𝗄)
-○ 𝖯𝗈𝗌𝗍𝖾𝗋 𝖠𝖯𝖨 : 𝖲𝗉𝗂𝖽𝗒 𝖯𝗈𝗌𝗍𝖾𝗋 𝖠𝖯𝖨
 ○ 𝖲𝗎𝗉𝗉𝗈𝗋𝗍 𝖦𝗋𝗈𝗎𝗉 : <a href='https://t.me/AM_FILMS'>𝖳𝖺𝗉 𝖧𝖾𝗋𝖾</a></b>"""
 
 ABOUT_BUTTONS = InlineKeyboardMarkup([
@@ -137,28 +135,28 @@ Please try again in a moment.
 
 USAGE_MOVIE_TEXT = """ℹ️ **Usage:** `/movie Title [Year]`
 
-• `/movie RRR 2022`
-• `/movie Bahubali`
+• /movie RRR 2022
+• /movie Bahubali
 """
 
 USAGE_TV_TEXT = """ℹ️ **Usage:** `/tv Title [Season]`
 
-• `/tv Asur 2`
-• `/tv Mirzapur`
+• /tv Asur 2
+• /tv Mirzapur
 """
 
 USAGE_QUERY_TEXT = """ℹ️ **Usage:** `/query Filename`
 
 Parses season, year, quality automatically from the filename.
 
-• `/query Asur.S02.1080p.mkv`
-• `/query RRR.2022.BluRay.mkv`
+• /query Asur.S02.1080p.mkv
+• /query RRR.2022.BluRay.mkv
 """
 
 USAGE_SEARCH_TEXT = """ℹ️ **Usage:** `/search Title`
 
-• `/search Pushpa`
-• `/search Family Man`
+• /search Pushpa
+• /search Family Man
 """
 
 
