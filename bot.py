@@ -6,7 +6,7 @@ import threading
 import logging
 import aiohttp
 
-from pyrogram import Client, filters
+from pyrogram import Client, filters, enums
 from pyrogram.types import (
     CallbackQuery,
     LinkPreviewOptions,
@@ -382,7 +382,7 @@ async def cmd_about(client: Client, message: Message):
     await message.reply(
         ABOUT_TEXT.format(me.first_name),
         reply_markup=ABOUT_BUTTONS,
-        parse_mode="html",
+        parse_mode=enums.ParseMode.HTML,
     )
 
 
@@ -711,7 +711,7 @@ async def cb_about(client: Client, query: CallbackQuery):
     await query.edit_message_text(
         ABOUT_TEXT.format(me.first_name),
         reply_markup=ABOUT_BUTTONS,
-        parse_mode="html",
+        parse_mode=enums.ParseMode.HTML,
     )
     await query.answer()
 
