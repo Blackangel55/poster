@@ -227,6 +227,29 @@ def url_hash(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
 
+def is_valid_image(data: bytes) -> bool:
+    """
+    Check magic bytes to confirm the download is actually an image.
+    Telegram rejects non-image bytes with PHOTO_SAVE_FILE_INVALID.
+    Supported: JPEG, PNG, WEBP, GIF
+    """
+    if not data or len(data) < 4:
+        return False
+    # JPEG: FF D8 FF
+    if data[:3] == b'\xff\xd8\xff':
+        return True
+    # PNG: 89 50 4E 47
+    if data[:4] == b'\x89PNG':
+        return True
+    # WEBP: RIFF....WEBP
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return True
+    # GIF: GIF87a or GIF89a
+    if data[:6] in (b'GIF87a', b'GIF89a'):
+        return True
+    return False
+
+
 # ─── CORE POSTER SENDER ──────────────────────────────────────────────────────
 async def send_poster(
     client: Client,
@@ -262,53 +285,74 @@ async def send_poster(
     if cached and cached.get("file_id"):
         # Best case: reuse Telegram file_id — instant, no download
         log.info("Cache HIT (file_id): %s", cache_key)
-        await client.send_photo(
-            chat_id=message.chat.id,
-            photo=cached["file_id"],
-            caption=caption,
-            reply_markup=keyboard,
-        )
-        return
-
-    if cached and cached.get("bytes"):
-        # file_id missing but bytes cached — send from DB bytes
-        log.info("Cache HIT (bytes): %s", cache_key)
-        image_bytes = bytes(cached["bytes"])
-    else:
-        # Cache MISS — download fresh
-        log.info("Cache MISS — downloading: %s", image_url)
-        image_bytes = await download_image(image_url)
-        if image_bytes:
-            # Save bytes to cache immediately (file_id added after send)
-            await db.cache_image(cache_key, image_url, image_bytes=image_bytes)
-
-    # ── 2. Send photo and capture Telegram file_id for future reuse ─────────
-    if image_bytes:
         try:
-            sent = await client.send_photo(
+            await client.send_photo(
                 chat_id=message.chat.id,
-                photo=io.BytesIO(image_bytes),
+                photo=cached["file_id"],
                 caption=caption,
                 reply_markup=keyboard,
             )
-            # Save file_id so next request skips the download entirely
-            if sent and sent.photo:
-                file_id = sent.photo.file_id
-                await db.update_file_id(cache_key, file_id)
-                log.info("file_id cached for future use: %s", file_id)
+            return
         except Exception as e:
-            log.error("send_photo failed: %s", e)
-            fallback = f"{caption}\n\n🖼 [View Image]({image_url})"
+            # file_id expired or invalid — clear it and fall through
+            log.warning("Cached file_id failed (%s), clearing and retrying", e)
+            await db.update_file_id(cache_key, None)
+
+    if cached and cached.get("bytes"):
+        # Bytes cached — validate before sending
+        image_bytes = bytes(cached["bytes"])
+        log.info("Cache HIT (bytes): %s", cache_key)
+        if not is_valid_image(image_bytes):
+            log.warning("Cached bytes are not a valid image — clearing cache entry")
+            await db.clear_cache(cache_key)
+            image_bytes = None
+    else:
+        image_bytes = None
+
+    # Cache MISS or invalid cached bytes — download fresh
+    if not image_bytes:
+        log.info("Downloading image: %s", image_url)
+        image_bytes = await download_image(image_url)
+
+        if not image_bytes:
+            log.error("Download returned empty response")
+            await message.reply(NOT_FOUND_TEXT.format(title=label))
+            return
+
+        if not is_valid_image(image_bytes):
+            # Downloaded file is not a real image (HTML error page, etc.)
+            log.error(
+                "Downloaded file is not a valid image (magic bytes: %s) — url: %s",
+                image_bytes[:16].hex(), image_url
+            )
             await message.reply(
-                fallback,
+                f"{caption}\n\n"
+                "⚠️ _Poster image could not be loaded (invalid format)._\n"
+                f"🖼 [View directly]({image_url})",
                 reply_markup=keyboard,
                 link_preview_options=LinkPreviewOptions(is_disabled=True),
             )
-    else:
-        # Complete failure — send as link
-        fallback = f"{caption}\n\n🖼 [View Image]({image_url})"
+            return
+
+        # Valid image — cache bytes now, file_id after send
+        await db.cache_image(cache_key, image_url, image_bytes=image_bytes)
+
+    # ── 2. Send photo and capture Telegram file_id for future reuse ─────────
+    try:
+        sent = await client.send_photo(
+            chat_id=message.chat.id,
+            photo=io.BytesIO(image_bytes),
+            caption=caption,
+            reply_markup=keyboard,
+        )
+        # Save Telegram file_id — future sends skip download entirely
+        if sent and sent.photo:
+            await db.update_file_id(cache_key, sent.photo.file_id)
+            log.info("file_id cached: %s", sent.photo.file_id)
+    except Exception as e:
+        log.error("send_photo failed: %s", e)
         await message.reply(
-            fallback,
+            f"{caption}\n\n🖼 [View Image]({image_url})",
             reply_markup=keyboard,
             link_preview_options=LinkPreviewOptions(is_disabled=True),
         )
