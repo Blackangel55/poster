@@ -21,7 +21,8 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 # Copy bot source files
-COPY bot.py config.py script.py database.py ./
+COPY *.py ./
+COPY database/ ./database/
 
 # Create session directory and set permissions BEFORE switching to non-root
 RUN mkdir -p /app/sessions && chmod 777 /app/sessions
