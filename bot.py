@@ -227,6 +227,32 @@ def url_hash(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
 
+def convert_to_jpeg(image_bytes: bytes) -> bytes:
+    """
+    Convert any valid image to JPEG using Pillow.
+    Telegram reliably accepts JPEG — this fixes PHOTO_SAVE_FILE_INVALID
+    for WebP, PNG with alpha, and other edge-case formats.
+    Returns original bytes if conversion fails.
+    """
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(image_bytes))
+        # Convert RGBA/P mode images (PNG with transparency) to RGB for JPEG
+        if img.mode in ("RGBA", "P", "LA"):
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=90)
+        converted = buf.getvalue()
+        log.info(
+            "Converted image to JPEG: %d bytes → %d bytes",
+            len(image_bytes), len(converted)
+        )
+        return converted
+    except Exception as e:
+        log.warning("JPEG conversion failed (%s) — using original bytes", e)
+        return image_bytes
+
+
 def is_valid_image(data: bytes) -> bool:
     """
     Check magic bytes to confirm the download is actually an image.
@@ -337,7 +363,11 @@ async def send_poster(
         # Valid image — cache bytes now, file_id after send
         await db.cache_image(cache_key, image_url, image_bytes=image_bytes)
 
-    # ── 2. Send photo and capture Telegram file_id for future reuse ─────────
+    # ── 2. Try converting to JPEG first (fixes most Telegram rejections) ─────
+    image_bytes = convert_to_jpeg(image_bytes)
+    await db.cache_image(cache_key, image_url, image_bytes=image_bytes)
+
+    # ── 3. Send photo — Telegram file_id cached on success ──────────────────
     try:
         sent = await client.send_photo(
             chat_id=message.chat.id,
@@ -345,17 +375,35 @@ async def send_poster(
             caption=caption,
             reply_markup=keyboard,
         )
-        # Save Telegram file_id — future sends skip download entirely
         if sent and sent.photo:
             await db.update_file_id(cache_key, sent.photo.file_id)
             log.info("file_id cached: %s", sent.photo.file_id)
+        return
     except Exception as e:
-        log.error("send_photo failed: %s", e)
-        await message.reply(
-            f"{caption}\n\n🖼 [View Image]({image_url})",
+        log.warning("send_photo failed (%s) — trying send_document", e)
+
+    # ── 4. Fallback: send as document (always accepted by Telegram) ──────────
+    try:
+        sent = await client.send_document(
+            chat_id=message.chat.id,
+            document=io.BytesIO(image_bytes),
+            file_name="poster.jpg",
+            caption=caption,
             reply_markup=keyboard,
-            link_preview_options=LinkPreviewOptions(is_disabled=True),
         )
+        if sent and sent.document:
+            await db.update_file_id(cache_key, sent.document.file_id)
+            log.info("Sent as document, file_id cached: %s", sent.document.file_id)
+        return
+    except Exception as e:
+        log.error("send_document also failed (%s) — sending link", e)
+
+    # ── 5. Last resort: send as plain link ───────────────────────────────────
+    await message.reply(
+        f"{caption}\n\n🖼 [View Poster]({image_url})",
+        reply_markup=keyboard,
+        link_preview_options=LinkPreviewOptions(is_disabled=True),
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════
