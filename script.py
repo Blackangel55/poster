@@ -8,29 +8,13 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 START_TEXT = """🎬 **Welcome to OTT Poster Bot!**
 
 Hey {first_name}! 👋
-I fetch **movie & TV show posters** instantly using the Spidy Poster API.
+I fetch **movie & TV show posters** instantly.
 
-━━━━━━━━━━━━━━━━━━━━
-📌 **Commands**
-━━━━━━━━━━━━━━━━━━━━
-
-🎬 `/movie Title [Year]`
-   _Example:_ `/movie RRR 2022`
-
-📺 `/tv Title [Season]`
-   _Example:_ `/tv Asur 2`
-
-🗂 `/query Filename`
-   _Example:_ `/query Asur.S02.1080p.mkv`
-
-🔍 `/search Title`
-   _Example:_ `/search Mirzapur`
+_Example:_ `/movie RRR 2022`
+_Example:_ `/tv Asur 2`
 
 💡 `/help` — Full help & tips
 ℹ️ `/about` — About this bot
-
-━━━━━━━━━━━━━━━━━━━━
-Or just **type any title** to quick-search! 🚀
 """
 
 START_BUTTONS = InlineKeyboardMarkup([
