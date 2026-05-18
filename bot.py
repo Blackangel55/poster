@@ -431,6 +431,7 @@ async def cmd_about(client: Client, message: Message):
         ABOUT_TEXT.format(me.first_name),
         reply_markup=ABOUT_BUTTONS,
         parse_mode=enums.ParseMode.HTML,
+        link_preview_options=LinkPreviewOptions(is_disabled=True),
     )
 
 
@@ -760,6 +761,7 @@ async def cb_about(client: Client, query: CallbackQuery):
         ABOUT_TEXT.format(me.first_name),
         reply_markup=ABOUT_BUTTONS,
         parse_mode=enums.ParseMode.HTML,
+        link_preview_options=LinkPreviewOptions(is_disabled=True),
     )
     await query.answer()
 
