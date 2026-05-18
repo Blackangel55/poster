@@ -19,10 +19,6 @@ _Example:_ `/tv Asur 2`
 
 START_BUTTONS = InlineKeyboardMarkup([
     [
-        InlineKeyboardButton("🎬 Movie", switch_inline_query_current_chat="movie "),
-        InlineKeyboardButton("📺 TV Series", switch_inline_query_current_chat="tv "),
-    ],
-    [
         InlineKeyboardButton("💡 Help", callback_data="help"),
         InlineKeyboardButton("ℹ️ About", callback_data="about"),
     ],
