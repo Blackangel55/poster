@@ -114,19 +114,12 @@ HELP_BUTTONS = InlineKeyboardMarkup([
 # ABOUT MESSAGE
 # ════════════════════════════════════════════════════════════════════════════
 
-ABOUT_TEXT =  """<b>○ 𝖬𝗒 𝖭𝖺𝗆𝖾: {}
+ABOUT_TEXT = """<b>○ 𝖬𝗒 𝖭𝖺𝗆𝖾: {}
 ○ 𝖢𝗋𝖾𝖺𝗍𝗈𝗋 : <a href='https://t.me/GUARDIANff'>𝖳𝗁𝗂𝗌 𝖯𝖾𝗋𝗌𝗈𝗇</a>
-○ 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : 𝖯𝗒𝗍𝗁𝗈𝗇 𝟥 
-○ 𝖫𝗂𝖻𝗋𝖺𝗋𝗒 : 𝖯𝗒𝗋𝗈𝗀𝗋𝖺𝗆 𝖺𝗌𝗒𝗇𝖼𝗂𝗈 𝟢.𝟣𝟩.𝟣 
-○ 𝖲𝖾𝗋𝗏𝖾𝗋 : Contabo
-○ 𝖲𝗎𝗉𝗉𝗈𝗋𝗍 𝖦𝗋𝗈𝗎𝗉 : <a href='https://t.me/AM_FILMS'>𝖳𝖺𝗉 𝖧𝖾𝗋𝖾</a>"""
-
-Fetches high-quality **movie & OTT series posters** \
-with portrait and landscape images.
-
-Supports searching by title, year, season, or even \
-a raw filename like `Asur.S02.1080p.mkv`. 🎬📺
-"""
+○ 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : 𝖯𝗒𝗍𝗁𝗈𝗇 𝟥
+○ 𝖫𝗂𝖻𝗋𝖺𝗋𝗒 : 𝖪𝗎𝗋𝗂𝗀𝗋𝖺𝗆 (𝖯𝗒𝗋𝗈𝗀𝗋𝖺𝗆 𝖿𝗈𝗋𝗄)
+○ 𝖯𝗈𝗌𝗍𝖾𝗋 𝖠𝖯𝖨 : 𝖲𝗉𝗂𝖽𝗒 𝖯𝗈𝗌𝗍𝖾𝗋 𝖠𝖯𝖨
+○ 𝖲𝗎𝗉𝗉𝗈𝗋𝗍 𝖦𝗋𝗈𝗎𝗉 : <a href='https://t.me/AM_FILMS'>𝖳𝖺𝗉 𝖧𝖾𝗋𝖾</a></b>"""
 
 ABOUT_BUTTONS = InlineKeyboardMarkup([
     [InlineKeyboardButton("🏠 Back to Start", callback_data="start")],
@@ -137,7 +130,7 @@ ABOUT_BUTTONS = InlineKeyboardMarkup([
 # STATUS MESSAGES
 # ════════════════════════════════════════════════════════════════════════════
 
-SEARCHING_TEXT = """🔍 Searching for **{title}**…"""
+SEARCHING_TEXT = "🔍 Searching for **{title}**…"
 
 NOT_FOUND_TEXT = """❌ **No results found for:** `{title}`
 
@@ -158,13 +151,13 @@ Please try again in a moment.
 # USAGE / EMPTY COMMAND MESSAGES
 # ════════════════════════════════════════════════════════════════════════════
 
-USAGE_MOVIE_TEXT = """<b>ℹ️ Usage: `/movie Title [Year]`
+USAGE_MOVIE_TEXT = """ℹ️ **Usage:** `/movie Title [Year]`
 
 • `/movie RRR 2022`
-• `/movie Bahubali`</b>
+• `/movie Bahubali`
 """
 
-USAGE_TV_TEXT = """ℹ️ Usage: `/tv Title [Season]`
+USAGE_TV_TEXT = """ℹ️ **Usage:** `/tv Title [Season]`
 
 • `/tv Asur 2`
 • `/tv Mirzapur`
@@ -228,19 +221,13 @@ USAGE_DELFSUB = "Usage: `/delfsub <channel_id>`\nExample: `/delfsub -10012345678
 
 def build_caption(data: dict, plot_max: int = 280) -> str:
     """
-    Build a Markdown caption from Spidy API response.
-
-    Real Spidy API fields (from live response):
-      title     → str
-      year      → int
-      landscape → URL (wide banner image — main image returned)
+    Build a caption from Spidy API response.
+    Real fields: title (str), year (int), landscape (URL)
     """
     title = data.get("title", "Unknown")
     year  = data.get("year", "")
 
     lines = []
-
-    # ── Title + year ──
     if year:
         lines.append(f"🎬 **{title}** ({year})")
     else:
@@ -256,8 +243,5 @@ def build_caption(data: dict, plot_max: int = 280) -> str:
 # ════════════════════════════════════════════════════════════════════════════
 
 def build_keyboard(data: dict) -> InlineKeyboardMarkup | None:
-    """
-    Build inline buttons from Spidy API response.
-    No extra URLs in current API response — reserved for future use.
-    """
+    """Reserved for future use when API returns extra URLs."""
     return None
