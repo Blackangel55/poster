@@ -186,7 +186,7 @@ async def fetch_poster(
 
                 results = data.get("results", [])
                 if not results:
-                    log.warning("Spidy API returned empty results")
+                    log.warning("Returned empty results.Request with year.")
                     return None
 
                 result = results[0]
@@ -203,7 +203,6 @@ async def fetch_poster(
 
 # ─── IMAGE DOWNLOADER ────────────────────────────────────────────────────────
 async def download_image(url: str) -> bytes | None:
-    """Download image with browser UA to bypass CDN restrictions (Zee5, Hotstar etc.)"""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -232,12 +231,6 @@ def url_hash(url: str) -> str:
 
 
 def convert_to_jpeg(image_bytes: bytes) -> bytes:
-    """
-    Convert any valid image to JPEG using Pillow.
-    Telegram reliably accepts JPEG — this fixes PHOTO_SAVE_FILE_INVALID
-    for WebP, PNG with alpha, and other edge-case formats.
-    Returns original bytes if conversion fails.
-    """
     try:
         from PIL import Image
         img = Image.open(io.BytesIO(image_bytes))
@@ -258,11 +251,6 @@ def convert_to_jpeg(image_bytes: bytes) -> bytes:
 
 
 def is_valid_image(data: bytes) -> bool:
-    """
-    Check magic bytes to confirm the download is actually an image.
-    Telegram rejects non-image bytes with PHOTO_SAVE_FILE_INVALID.
-    Supported: JPEG, PNG, WEBP, GIF
-    """
     if not data or len(data) < 4:
         return False
     # JPEG: FF D8 FF
@@ -657,10 +645,6 @@ async def cmd_broadcast(client: Client, message: Message):
 
 @app.on_message(filters.command("addfsub") & filters.private)
 async def cmd_addfsub(client: Client, message: Message):
-    """
-    /addfsub <channel_id>
-    Bot must be admin in the channel with invite link permission.
-    """
     if not await is_admin(message.from_user.id):
         return await message.reply("⛔ Admins only.")
 
