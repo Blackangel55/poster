@@ -1,5 +1,6 @@
 import io
 import os
+import hashlib
 import asyncio
 import threading
 import logging
@@ -198,7 +199,7 @@ async def fetch_poster(
 
 # ─── IMAGE DOWNLOADER ────────────────────────────────────────────────────────
 async def download_image(url: str) -> bytes | None:
-    """Download image with browser UA to bypass CDN restrictions."""
+    """Download image with browser UA to bypass CDN restrictions (Zee5, Hotstar etc.)"""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -219,6 +220,11 @@ async def download_image(url: str) -> bytes | None:
     except Exception as e:
         log.error("Image download failed: %s", e)
     return None
+
+
+def url_hash(url: str) -> str:
+    """Short MD5 hash of a URL — used as the MongoDB cache key."""
+    return hashlib.md5(url.encode()).hexdigest()
 
 
 # ─── CORE POSTER SENDER ──────────────────────────────────────────────────────
@@ -248,17 +254,58 @@ async def send_poster(
 
     caption  = build_caption(data, plot_max=PLOT_MAX_CHARS)
     keyboard = build_keyboard(data)
+    cache_key = url_hash(image_url)
 
-    image_bytes = await download_image(image_url)
+    # ── 1. Check MongoDB cache ──────────────────────────────────────────────
+    cached = await db.get_cached_image(cache_key)
 
-    if image_bytes:
+    if cached and cached.get("file_id"):
+        # Best case: reuse Telegram file_id — instant, no download
+        log.info("Cache HIT (file_id): %s", cache_key)
         await client.send_photo(
             chat_id=message.chat.id,
-            photo=io.BytesIO(image_bytes),
+            photo=cached["file_id"],
             caption=caption,
             reply_markup=keyboard,
         )
+        return
+
+    if cached and cached.get("bytes"):
+        # file_id missing but bytes cached — send from DB bytes
+        log.info("Cache HIT (bytes): %s", cache_key)
+        image_bytes = bytes(cached["bytes"])
     else:
+        # Cache MISS — download fresh
+        log.info("Cache MISS — downloading: %s", image_url)
+        image_bytes = await download_image(image_url)
+        if image_bytes:
+            # Save bytes to cache immediately (file_id added after send)
+            await db.cache_image(cache_key, image_url, image_bytes=image_bytes)
+
+    # ── 2. Send photo and capture Telegram file_id for future reuse ─────────
+    if image_bytes:
+        try:
+            sent = await client.send_photo(
+                chat_id=message.chat.id,
+                photo=io.BytesIO(image_bytes),
+                caption=caption,
+                reply_markup=keyboard,
+            )
+            # Save file_id so next request skips the download entirely
+            if sent and sent.photo:
+                file_id = sent.photo.file_id
+                await db.update_file_id(cache_key, file_id)
+                log.info("file_id cached for future use: %s", file_id)
+        except Exception as e:
+            log.error("send_photo failed: %s", e)
+            fallback = f"{caption}\n\n🖼 [View Image]({image_url})"
+            await message.reply(
+                fallback,
+                reply_markup=keyboard,
+                link_preview_options=LinkPreviewOptions(is_disabled=True),
+            )
+    else:
+        # Complete failure — send as link
         fallback = f"{caption}\n\n🖼 [View Image]({image_url})"
         await message.reply(
             fallback,
