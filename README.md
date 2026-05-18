@@ -4,16 +4,6 @@ Telegram bot that fetches movie & TV show posters.
 
 ---
 
-## Requirements
-
-- Python 3.12+
-- Telegram **API_ID** and **API_HASH** from https://my.telegram.org
-- A **Bot Token** from [@BotFather](https://t.me/BotFather)
-- Your **Spidy API Key** from https://poster-api.ispidy.com
-- A **MongoDB** URI from https://cloud.mongodb.com (free tier works)
-
----
-
 ## Install
 
 ```bash
