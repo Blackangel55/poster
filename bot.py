@@ -9,6 +9,7 @@ import aiohttp
 from pyrogram import Client, filters, enums
 from pyrogram.types import (
     CallbackQuery,
+    InputMediaPhoto,
     LinkPreviewOptions,
     Message,
 )
@@ -30,7 +31,6 @@ from config import (
     SPIDY_KEY,
     SPIDY_BASE,
     SESSION_NAME,
-    DC_ID,
     PLOT_MAX_CHARS,
     API_TIMEOUT,
 )
@@ -38,6 +38,7 @@ from config import (
 # ─── SCRIPT ──────────────────────────────────────────────────────────────────
 from script import (
     START_TEXT,
+    START_IMAGE,
     START_BUTTONS,
     HELP_TEXT,
     HELP_BUTTONS,
@@ -416,10 +417,19 @@ async def send_poster(
 @app.on_message(filters.command("start") & filters.private)
 async def cmd_start(client: Client, message: Message):
     first_name = message.from_user.first_name or "there"
-    await message.reply(
-        START_TEXT.format(first_name=first_name),
-        reply_markup=START_BUTTONS,
-    )
+    try:
+        await client.send_photo(
+            chat_id=message.chat.id,
+            photo=START_IMAGE,
+            caption=START_TEXT.format(first_name=first_name),
+            reply_markup=START_BUTTONS,
+        )
+    except Exception:
+        # Fallback to plain text if image fails
+        await message.reply(
+            START_TEXT.format(first_name=first_name),
+            reply_markup=START_BUTTONS,
+        )
 
 
 @app.on_message(filters.command("help") & filters.private)
@@ -744,10 +754,19 @@ async def cb_check_fsub(client: Client, query: CallbackQuery):
 @app.on_callback_query(filters.regex("^start$"))
 async def cb_start(client: Client, query: CallbackQuery):
     first_name = query.from_user.first_name or "there"
-    await query.edit_message_text(
-        START_TEXT.format(first_name=first_name),
-        reply_markup=START_BUTTONS,
-    )
+    try:
+        await query.edit_message_media(
+            media=InputMediaPhoto(
+                media=START_IMAGE,
+                caption=START_TEXT.format(first_name=first_name),
+            ),
+            reply_markup=START_BUTTONS,
+        )
+    except Exception:
+        await query.edit_message_text(
+            START_TEXT.format(first_name=first_name),
+            reply_markup=START_BUTTONS,
+        )
     await query.answer()
 
 
