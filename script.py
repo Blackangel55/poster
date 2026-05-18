@@ -1,10 +1,6 @@
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# START MESSAGE
-# ════════════════════════════════════════════════════════════════════════════
-
+START_IMAGE = "https://i.ibb.co/ZpbyxgPM/x.jpg" 
 START_TEXT = """🎬 **Welcome to OTT Poster Bot!**
 
 Hey {first_name}! 👋
