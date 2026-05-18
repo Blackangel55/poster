@@ -21,7 +21,7 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 # Copy bot source files
-COPY bot.py config.py script.py ./
+COPY bot.py config.py script.py database.py ./
 
 # Create session directory and set permissions BEFORE switching to non-root
 RUN mkdir -p /app/sessions && chmod 777 /app/sessions
@@ -35,7 +35,7 @@ ENV API_ID=""
 ENV API_HASH=""
 ENV BOT_TOKEN=""
 ENV SPIDY_KEY=""
-ENV SPIDY_BASE="https://api.spidyposter.com/v1/fetch"
+ENV SPIDY_BASE="https://poster-api.ispidy.com/v1/fetch"
 ENV SESSION_NAME="/app/sessions/ott_poster_bot"
 ENV PLOT_MAX_CHARS="280"
 ENV API_TIMEOUT="15"
